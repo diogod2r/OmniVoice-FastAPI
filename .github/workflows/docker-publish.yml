@@ -34,8 +34,8 @@ jobs:
           file: docker/gpu/Dockerfile
           push: true
           tags: diogod2r/omnivoice-fastapi:latest
-          cache-from: type=registry,ref=diogod2r/omnivoice-fastapi:buildcache-gpu
-          cache-to: type=registry,ref=diogod2r/omnivoice-fastapi:buildcache-gpu,mode=max
+          cache-from: type=gha,scope=gpu
+          cache-to: type=gha,scope=gpu,mode=max
 
   build-cpu:
     name: Build CPU image
@@ -60,5 +60,5 @@ jobs:
           file: docker/cpu/Dockerfile
           push: true
           tags: diogod2r/omnivoice-fastapi:cpu
-          cache-from: type=registry,ref=diogod2r/omnivoice-fastapi:buildcache-cpu
-          cache-to: type=registry,ref=diogod2r/omnivoice-fastapi:buildcache-cpu,mode=max
+          cache-from: type=gha,scope=cpu
+          cache-to: type=gha,scope=cpu,mode=max

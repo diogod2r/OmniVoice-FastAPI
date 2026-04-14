@@ -1,5 +1,6 @@
 import io
 import os
+import base64
 import time
 import logging
 import tempfile
@@ -256,7 +257,8 @@ async def openai_tts(req: SpeechRequest):
 @app.post("/v1/audio/clone", tags=["Voice Cloning"], response_class=Response, responses=_AUDIO_RESPONSES)
 async def clone_voice(
     text: str = Form(..., description="Text to synthesize in the cloned voice"),
-    ref_audio: UploadFile = File(..., description="Reference audio file (WAV/MP3/M4A). 3–10 seconds recommended for best results."),
+    ref_audio: Optional[UploadFile] = File(None, description="Reference audio file (WAV/MP3/M4A). 3–10 seconds recommended. Use this OR ref_audio_base64."),
+    ref_audio_base64: Optional[str] = Form(None, description="Reference audio as base64-encoded string (WAV/MP3/M4A). Use this OR ref_audio file upload."),
     ref_text: Optional[str] = Form(
         None,
         description="Transcription of ref_audio. If omitted, Whisper ASR auto-transcribes it.",
@@ -290,10 +292,23 @@ async def clone_voice(
     if not omnivoice_model:
         raise HTTPException(503, "Model not loaded")
 
-    suffix = os.path.splitext(ref_audio.filename or "ref.wav")[1] or ".wav"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(await ref_audio.read())
-        tmp_path = tmp.name
+    if not ref_audio and not ref_audio_base64:
+        raise HTTPException(400, "Provide ref_audio (file upload) or ref_audio_base64 (base64 string)")
+
+    if ref_audio_base64:
+        try:
+            audio_bytes = base64.b64decode(ref_audio_base64)
+        except Exception:
+            raise HTTPException(400, "ref_audio_base64 is not valid base64")
+        suffix = ".wav"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+    else:
+        suffix = os.path.splitext(ref_audio.filename or "ref.wav")[1] or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(await ref_audio.read())
+            tmp_path = tmp.name
 
     try:
         kwargs: dict = {

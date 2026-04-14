@@ -1,0 +1,25 @@
+services:
+  omnivoice-api:
+    build:
+      context: ../../
+      dockerfile: docker/gpu/Dockerfile
+    ports:
+      - "8880:8880"
+    volumes:
+      - omnivoice_models:/app/models
+    environment:
+      - DEVICE=cuda:0
+      - MODEL_ID=k2-fsa/OmniVoice
+      # Optional: use mirror if HuggingFace is slow
+      # - HF_ENDPOINT=https://hf-mirror.com
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  omnivoice_models:

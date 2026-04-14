@@ -1,0 +1,18 @@
+services:
+  omnivoice-api:
+    build:
+      context: ../../
+      dockerfile: docker/cpu/Dockerfile
+    ports:
+      - "8880:8880"
+    volumes:
+      - omnivoice_models:/app/models
+    environment:
+      - DEVICE=cpu
+      - MODEL_ID=k2-fsa/OmniVoice
+      # Optional: use mirror if HuggingFace is slow
+      # - HF_ENDPOINT=https://hf-mirror.com
+    restart: unless-stopped
+
+volumes:
+  omnivoice_models:

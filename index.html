@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OmniVoice TTS</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #252840;
+    --accent: #6c63ff;
+    --accent2: #48cfad;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --border: #2d3148;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header h1 span { color: var(--accent); }
+  .badge { background: var(--accent); color: #fff; font-size: .7rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+  .tab { padding: .5rem 1.2rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: .9rem; transition: all .2s; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .4rem; margin-top: 1rem; }
+  label:first-child { margin-top: 0; }
+  input[type=text], input[type=range], textarea, select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: .6rem .9rem; font-size: .95rem;
+  }
+  textarea { min-height: 100px; resize: vertical; }
+  input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
+  .row { display: flex; gap: 1rem; align-items: flex-end; }
+  .row > * { flex: 1; }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: .75rem 2rem; font-size: 1rem; cursor: pointer; transition: opacity .2s; font-weight: 600;
+  }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary:hover:not(:disabled) { opacity: .85; }
+  .audio-out { margin-top: 1.2rem; }
+  audio { width: 100%; margin-top: .5rem; border-radius: 8px; }
+  .status { padding: .6rem 1rem; border-radius: 8px; font-size: .85rem; margin-top: .8rem; }
+  .status.error { background: #3b1f1f; border: 1px solid #7f2020; color: #ff7070; }
+  .status.ok    { background: #1a3128; border: 1px solid #2d6b4f; color: #48cfad; }
+  .hint { font-size: .78rem; color: var(--muted); margin-top: .3rem; }
+  .range-row { display: flex; align-items: center; gap: .8rem; }
+  .range-row input { flex: 1; }
+  .range-val { min-width: 36px; text-align: right; font-size: .9rem; color: var(--accent); }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 2rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Omni<span>Voice</span> FastAPI</h1>
+  <span class="badge">600+ Languages</span>
+  <span class="badge" style="background:var(--accent2)">OpenAI Compatible</span>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('tts')">🔊 Text to Speech</button>
+    <button class="tab" onclick="switchTab('clone')">🎙️ Voice Clone</button>
+    <button class="tab" onclick="switchTab('design')">🎨 Voice Design</button>
+    <button class="tab" onclick="switchTab('api')">📡 API Info</button>
+  </div>
+
+  <!-- TTS -->
+  <div id="panel-tts" class="panel active">
+    <div class="card">
+      <label>Text to synthesize</label>
+      <textarea id="tts-text" placeholder="Hello! This is OmniVoice speaking — supporting over 600 languages.">Hello! This is OmniVoice — a state-of-the-art TTS model supporting over 600 languages.</textarea>
+
+      <label>Voice preset</label>
+      <select id="tts-voice">
+        <option value="auto">auto</option>
+        <option value="female">female</option>
+        <option value="male">male</option>
+        <option value="female_en">female · American accent</option>
+        <option value="male_en">male · American accent</option>
+        <option value="female_br">female · British accent</option>
+        <option value="male_br">male · British accent</option>
+        <option value="child">child</option>
+        <option value="elderly">elderly female</option>
+        <option value="whisper">whisper</option>
+      </select>
+      <p class="hint">Or type any free-form instruct string in the field below (overrides preset):</p>
+      <input type="text" id="tts-instruct" placeholder="e.g. female, low pitch, british accent (leave blank to use preset)">
+
+      <label>Language <span style="color:var(--muted)">(optional — auto-detected if blank)</span></label>
+      <select id="tts-lang">
+        <option value="">auto-detect</option>
+        <option value="pt">pt — Portuguese (Brazil / Portugal)</option>
+        <option value="en">en — English</option>
+        <option value="es">es — Spanish</option>
+        <option value="fr">fr — French</option>
+        <option value="de">de — German</option>
+        <option value="it">it — Italian</option>
+        <option value="ja">ja — Japanese</option>
+        <option value="ko">ko — Korean</option>
+        <option value="zh">zh — Chinese (Mandarin)</option>
+        <option value="ru">ru — Russian</option>
+        <option value="arb">arb — Arabic (Standard)</option>
+        <option value="hi">hi — Hindi</option>
+      </select>
+
+      <label>Speed — <span id="tts-speed-val">1.0</span>×</label>
+      <div class="range-row">
+        <input type="range" id="tts-speed" min="0.25" max="4" step="0.05" value="1.0"
+          oninput="document.getElementById('tts-speed-val').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+      <p class="hint">Or set a fixed duration (seconds) — overrides speed:</p>
+      <input type="number" id="tts-duration" placeholder="e.g. 5.0 (leave blank to use speed)" min="0.1" step="0.1" style="max-width:260px">
+
+      <label>Diffusion steps — <span id="tts-step-val">32</span></label>
+      <div class="range-row">
+        <input type="range" id="tts-steps" min="1" max="128" step="1" value="32"
+          oninput="document.getElementById('tts-step-val').textContent=this.value">
+      </div>
+
+      <label>Guidance scale — <span id="tts-cfg-val">2.0</span></label>
+      <div class="range-row">
+        <input type="range" id="tts-cfg" min="0" max="20" step="0.1" value="2.0"
+          oninput="document.getElementById('tts-cfg-val').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+
+      <label>Output format</label>
+      <select id="tts-fmt"><option>wav</option><option>mp3</option><option>flac</option></select>
+
+      <br><button class="primary" onclick="runTTS()">Generate Speech</button>
+      <div id="tts-status"></div>
+      <div id="tts-out" class="audio-out"></div>
+    </div>
+  </div>
+
+  <!-- Clone -->
+  <div id="panel-clone" class="panel">
+    <div class="card">
+      <label>Text to synthesize</label>
+      <textarea id="clone-text" placeholder="Text to speak in the cloned voice..."></textarea>
+
+      <label>Reference audio (WAV/MP3)</label>
+      <input type="file" id="clone-ref" accept="audio/*" style="padding:.4rem">
+
+      <label>Reference transcription <span style="color:var(--muted)">(optional — auto-transcribed if blank)</span></label>
+      <input type="text" id="clone-ref-text" placeholder="What the reference audio says...">
+
+      <label>Language <span style="color:var(--muted)">(optional — auto-detected if blank)</span></label>
+      <select id="clone-lang">
+        <option value="">auto-detect</option>
+        <option value="pt">pt — Portuguese (Brazil / Portugal)</option>
+        <option value="en">en — English</option>
+        <option value="es">es — Spanish</option>
+        <option value="fr">fr — French</option>
+        <option value="de">de — German</option>
+        <option value="it">it — Italian</option>
+        <option value="ja">ja — Japanese</option>
+        <option value="ko">ko — Korean</option>
+        <option value="zh">zh — Chinese (Mandarin)</option>
+        <option value="ru">ru — Russian</option>
+        <option value="ar">ar — Arabic</option>
+        <option value="hi">hi — Hindi</option>
+      </select>
+      <p class="hint">Dica: selecione <strong>pt</strong> para evitar sotaque europeu ao falar em Português.</p>
+
+      <label>Diffusion steps — <span id="clone-step-val">32</span></label>
+      <div class="range-row">
+        <input type="range" id="clone-steps" min="1" max="128" step="1" value="32"
+          oninput="document.getElementById('clone-step-val').textContent=this.value">
+      </div>
+
+      <label>Guidance scale — <span id="clone-cfg-val">2.0</span></label>
+      <div class="range-row">
+        <input type="range" id="clone-cfg" min="0" max="20" step="0.1" value="2.0"
+          oninput="document.getElementById('clone-cfg-val').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+
+      <label>Speed — <span id="clone-speed-val">1.0</span>×</label>
+      <div class="range-row">
+        <input type="range" id="clone-speed" min="0.25" max="4" step="0.05" value="1.0"
+          oninput="document.getElementById('clone-speed-val').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+      <p class="hint">Or set a fixed duration (seconds) — overrides speed:</p>
+      <input type="number" id="clone-duration" placeholder="e.g. 5.0 (leave blank to use speed)" min="0.1" step="0.1" style="max-width:260px">
+
+      <label style="display:flex;align-items:center;gap:.6rem;margin-top:1rem">
+        <input type="checkbox" id="clone-preprocess" checked style="width:auto">
+        Preprocess reference audio (remove silences)
+      </label>
+
+      <br><button class="primary" onclick="runClone()">Clone Voice</button>
+      <div id="clone-status"></div>
+      <div id="clone-out" class="audio-out"></div>
+    </div>
+  </div>
+
+  <!-- Design -->
+  <div id="panel-design" class="panel">
+    <div class="card">
+      <label>Text to synthesize</label>
+      <textarea id="design-text" placeholder="Text to speak with the designed voice..."></textarea>
+
+      <label>Voice attributes (comma-separated)</label>
+      <input type="text" id="design-instruct" value="female, british accent" placeholder="e.g. male, low pitch, elderly">
+      <p class="hint">Supported: gender (male/female), age (child/elderly), pitch (very low / low / high / very high), style (whisper), English accents (American, British, Australian…), Chinese dialects (四川话, 陕西话…)</p>
+
+      <label>Language <span style="color:var(--muted)">(optional — auto-detected if blank)</span></label>
+      <select id="design-lang">
+        <option value="">auto-detect</option>
+        <option value="pt">pt — Portuguese (Brazil / Portugal)</option>
+        <option value="en">en — English</option>
+        <option value="es">es — Spanish</option>
+        <option value="fr">fr — French</option>
+        <option value="de">de — German</option>
+        <option value="it">it — Italian</option>
+        <option value="ja">ja — Japanese</option>
+        <option value="ko">ko — Korean</option>
+        <option value="zh">zh — Chinese (Mandarin)</option>
+        <option value="ru">ru — Russian</option>
+        <option value="arb">arb — Arabic (Standard)</option>
+        <option value="hi">hi — Hindi</option>
+      </select>
+      <p class="hint">Note: Voice Design was trained mainly on Chinese and English; other languages may produce unstable results.</p>
+
+      <label>Diffusion steps — <span id="design-step-val">32</span></label>
+      <div class="range-row">
+        <input type="range" id="design-steps" min="1" max="128" step="1" value="32"
+          oninput="document.getElementById('design-step-val').textContent=this.value">
+      </div>
+
+      <label>Guidance scale — <span id="design-cfg-val">2.0</span></label>
+      <div class="range-row">
+        <input type="range" id="design-cfg" min="0" max="20" step="0.1" value="2.0"
+          oninput="document.getElementById('design-cfg-val').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+
+      <label style="display:block">Duration (optional, overrides speed)</label>
+      <input type="number" id="design-duration" placeholder="e.g. 5.0 (leave blank for auto)" min="0.1" step="0.1" style="max-width:260px">
+
+      <br><button class="primary" onclick="runDesign()">Design & Generate</button>
+      <div id="design-status"></div>
+      <div id="design-out" class="audio-out"></div>
+    </div>
+  </div>
+
+  <!-- API -->
+  <div id="panel-api" class="panel">
+    <div class="card">
+      <h3 style="margin-bottom:1rem">OpenAI-Compatible Endpoint</h3>
+      <pre style="background:var(--surface2);padding:1rem;border-radius:8px;overflow:auto;font-size:.85rem"><code>from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8880/v1", api_key="not-needed")
+
+with client.audio.speech.with_streaming_response.create(
+    model="omnivoice",
+    voice="female_br",          # preset, or free-form instruct string
+    input="Hello from OmniVoice!",
+) as response:
+    response.stream_to_file("out.wav")</code></pre>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:1rem">Voice Cloning (curl)</h3>
+      <pre style="background:var(--surface2);padding:1rem;border-radius:8px;overflow:auto;font-size:.85rem"><code>curl -X POST http://localhost:8880/v1/audio/clone \
+  -F "text=Hello world" \
+  -F "ref_audio=@reference.wav" \
+  -F "ref_text=What the reference says" \
+  --output cloned.wav</code></pre>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:1rem">Links</h3>
+      <p><a href="/docs">📄 Swagger UI</a> &nbsp;|&nbsp; <a href="/redoc">📚 ReDoc</a> &nbsp;|&nbsp; <a href="/health">❤️ Health check</a></p>
+    </div>
+  </div>
+</div>
+
+<footer>Powered by <a href="https://github.com/k2-fsa/OmniVoice">OmniVoice</a> · Wrapped by OmniVoice-FastAPI</footer>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['tts','clone','design','api'][i]===name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+function setStatus(id, msg, ok) {
+  const el = document.getElementById(id+'-status');
+  el.className = 'status ' + (ok ? 'ok' : 'error');
+  el.textContent = msg;
+}
+
+function showAudio(id, blob, fmt) {
+  const url = URL.createObjectURL(blob);
+  const mime = fmt === 'mp3' ? 'audio/mpeg' : fmt === 'flac' ? 'audio/flac' : 'audio/wav';
+  document.getElementById(id+'-out').innerHTML =
+    `<audio controls src="${url}"></audio>
+     <br><a href="${url}" download="omnivoice.${fmt}" style="font-size:.85rem;color:var(--accent2)">⬇ Download</a>`;
+}
+
+async function runTTS() {
+  const text     = document.getElementById('tts-text').value.trim();
+  const instFree = document.getElementById('tts-instruct').value.trim();
+  const voice    = instFree || document.getElementById('tts-voice').value;
+  const lang     = document.getElementById('tts-lang').value;
+  const speed    = parseFloat(document.getElementById('tts-speed').value);
+  const durRaw   = document.getElementById('tts-duration').value;
+  const num_step = parseInt(document.getElementById('tts-steps').value);
+  const guidance_scale = parseFloat(document.getElementById('tts-cfg').value);
+  const fmt      = document.getElementById('tts-fmt').value;
+  if (!text) return setStatus('tts','Please enter some text.',false);
+  setStatus('tts','Generating…',true);
+  document.getElementById('tts-out').innerHTML = '';
+  const body = {model:'omnivoice', input:text, voice, num_step, guidance_scale, response_format:fmt};
+  if (lang) body.language_id = lang;
+  if (durRaw) body.duration = parseFloat(durRaw); else body.speed = speed;
+  try {
+    const res = await fetch('/v1/audio/speech', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { const e=await res.json(); return setStatus('tts','Error: '+JSON.stringify(e.detail),false); }
+    const blob = await res.blob();
+    showAudio('tts', blob, fmt);
+    const rtf = res.headers.get('X-RTF');
+    setStatus('tts', `Done! RTF: ${rtf ?? '?'}`, true);
+  } catch(e) { setStatus('tts','Network error: '+e.message,false); }
+}
+
+async function runClone() {
+  const text        = document.getElementById('clone-text').value.trim();
+  const refFile     = document.getElementById('clone-ref').files[0];
+  const refText     = document.getElementById('clone-ref-text').value.trim();
+  const lang        = document.getElementById('clone-lang').value;
+  const steps       = document.getElementById('clone-steps').value;
+  const guidance_scale = document.getElementById('clone-cfg').value;
+  const speed       = document.getElementById('clone-speed').value;
+  const durRaw      = document.getElementById('clone-duration').value;
+  const preprocess  = document.getElementById('clone-preprocess').checked;
+  if (!text || !refFile) return setStatus('clone','Please enter text and upload a reference audio.',false);
+  setStatus('clone','Cloning voice…',true);
+  document.getElementById('clone-out').innerHTML = '';
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('ref_audio', refFile);
+  if (refText) fd.append('ref_text', refText);
+  if (lang)    fd.append('language_id', lang);
+  fd.append('num_step', steps);
+  fd.append('guidance_scale', guidance_scale);
+  fd.append('preprocess_prompt', preprocess);
+  if (durRaw) fd.append('duration', durRaw); else fd.append('speed', speed);
+  try {
+    const res = await fetch('/v1/audio/clone', {method:'POST', body:fd});
+    if (!res.ok) { const e=await res.json(); return setStatus('clone','Error: '+JSON.stringify(e.detail),false); }
+    showAudio('clone', await res.blob(), 'wav');
+    setStatus('clone','Done!',true);
+  } catch(e) { setStatus('clone','Network error: '+e.message,false); }
+}
+
+async function runDesign() {
+  const text     = document.getElementById('design-text').value.trim();
+  const instruct = document.getElementById('design-instruct').value.trim();
+  const lang     = document.getElementById('design-lang').value;
+  const steps    = document.getElementById('design-steps').value;
+  const guidance_scale = document.getElementById('design-cfg').value;
+  const durRaw   = document.getElementById('design-duration').value;
+  if (!text || !instruct) return setStatus('design','Please enter text and voice attributes.',false);
+  setStatus('design','Generating…',true);
+  document.getElementById('design-out').innerHTML = '';
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('instruct', instruct);
+  fd.append('num_step', steps);
+  fd.append('guidance_scale', guidance_scale);
+  if (lang) fd.append('language_id', lang);
+  if (durRaw) fd.append('duration', durRaw);
+  try {
+    const res = await fetch('/v1/audio/design', {method:'POST', body:fd});
+    if (!res.ok) { const e=await res.json(); return setStatus('design','Error: '+JSON.stringify(e.detail),false); }
+    showAudio('design', await res.blob(), 'wav');
+    setStatus('design','Done!',true);
+  } catch(e) { setStatus('design','Network error: '+e.message,false); }
+}
+</script>
+</body>
+</html>

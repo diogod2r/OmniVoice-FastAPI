@@ -37,6 +37,8 @@ The API is available at **http://localhost:8880/docs**.
 
 ### Docker Hub
 
+[![Docker Hub](https://img.shields.io/docker/pulls/diogod2r/omnivoice-fastapi?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/diogod2r/omnivoice-fastapi)
+
 ```bash
 # GPU
 docker run --gpus all -p 8880:8880 -v omnivoice_models:/app/models diogod2r/omnivoice-fastapi:latest

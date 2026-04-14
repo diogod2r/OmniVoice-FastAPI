@@ -66,6 +66,14 @@
   .gh-btn:hover { background: #fff2; color: #fff; }
   .gh-btn svg { flex-shrink: 0; }
   .gh-star { background: var(--accent); border-color: var(--accent); border-radius: 6px; padding: .2rem .6rem; font-size: .75rem; margin-left: .3rem; }
+  .ref-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .ref-row input[type=file] { flex: 1; min-width: 0; }
+  button.record-btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .5rem 1rem; cursor: pointer; font-size: .88rem; white-space: nowrap; transition: all .2s; flex-shrink: 0; }
+  button.record-btn:hover { border-color: var(--accent); color: var(--accent); }
+  button.record-btn.recording { background: #3b1212; border-color: #ff4040; color: #ff6060; animation: recpulse 1s ease-in-out infinite; }
+  @keyframes recpulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+  .rec-preview { margin-top: .6rem; display: none; }
+  .rec-preview audio { width: 100%; margin-top: 0; }
 </style>
 </head>
 <body>
@@ -162,8 +170,15 @@
       <label>Text to synthesize</label>
       <textarea id="clone-text" placeholder="Text to speak in the cloned voice..."></textarea>
 
-      <label>Reference audio (WAV/MP3)</label>
-      <input type="file" id="clone-ref" accept="audio/*" style="padding:.4rem">
+      <label>Reference audio (WAV/MP3/M4A)</label>
+      <div class="ref-row">
+        <input type="file" id="clone-ref" accept="audio/*" style="padding:.4rem" onchange="clearRecording()">
+        <button class="record-btn" id="record-btn" onclick="toggleRecord()">🎤 Gravar</button>
+      </div>
+      <div class="rec-preview" id="rec-preview">
+        <audio id="rec-audio" controls></audio>
+        <p class="hint" id="rec-hint"></p>
+      </div>
 
       <label>Reference transcription <span style="color:var(--muted)">(optional — auto-transcribed if blank)</span></label>
       <input type="text" id="clone-ref-text" placeholder="What the reference audio says...">
@@ -351,7 +366,7 @@ async function runTTS() {
 
 async function runClone() {
   const text        = document.getElementById('clone-text').value.trim();
-  const refFile     = document.getElementById('clone-ref').files[0];
+  const refFile     = document.getElementById('clone-ref').files[0] || recordedBlob;
   const refText     = document.getElementById('clone-ref-text').value.trim();
   const lang        = document.getElementById('clone-lang').value;
   const steps       = document.getElementById('clone-steps').value;
@@ -359,12 +374,12 @@ async function runClone() {
   const speed       = document.getElementById('clone-speed').value;
   const durRaw      = document.getElementById('clone-duration').value;
   const preprocess  = document.getElementById('clone-preprocess').checked;
-  if (!text || !refFile) return setStatus('clone','Please enter text and upload a reference audio.',false);
+  if (!text || !refFile) return setStatus('clone','Insira o texto e o áudio de referência (arquivo ou gravação).',false);
   setStatus('clone','Cloning voice…',true);
   document.getElementById('clone-out').innerHTML = '';
   const fd = new FormData();
   fd.append('text', text);
-  fd.append('ref_audio', refFile);
+  fd.append('ref_audio', refFile, refFile.name || 'recording.webm');
   if (refText) fd.append('ref_text', refText);
   if (lang)    fd.append('language_id', lang);
   fd.append('num_step', steps);
@@ -377,6 +392,61 @@ async function runClone() {
     showAudio('clone', await res.blob(), 'wav');
     setStatus('clone','Done!',true);
   } catch(e) { setStatus('clone','Network error: '+e.message,false); }
+}
+
+// ── Microphone recording ─────────────────────────────────────────────────────
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordedBlob   = null;
+
+async function toggleRecord() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    recordedBlob   = null;
+    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+      const url = URL.createObjectURL(recordedBlob);
+      document.getElementById('rec-audio').src = url;
+      document.getElementById('rec-preview').style.display = 'block';
+      document.getElementById('rec-hint').textContent =
+        '✔ Gravação pronta — ' + (recordedBlob.size / 1024).toFixed(1) + ' KB. Pode gravar novamente para substituir.';
+      document.getElementById('clone-ref').value = '';
+    };
+    mediaRecorder.start();
+    const btn = document.getElementById('record-btn');
+    btn.textContent = '⏹ Parar';
+    btn.classList.add('recording');
+  } catch(e) {
+    alert('Erro ao acessar microfone: ' + e.message);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    const btn = document.getElementById('record-btn');
+    btn.textContent = '🎤 Gravar';
+    btn.classList.remove('recording');
+  }
+}
+
+function clearRecording() {
+  recordedBlob = null;
+  document.getElementById('rec-preview').style.display = 'none';
+  document.getElementById('rec-audio').src = '';
 }
 
 async function runDesign() {

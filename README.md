@@ -9,7 +9,7 @@ Dockerized FastAPI wrapper for [OmniVoice](https://github.com/k2-fsa/OmniVoice) 
 - **`/v1/audio/speech`** — OpenAI-compatible drop-in replacement (works with Open WebUI, SillyTavern, etc.)
 - **`/v1/audio/clone`** — Zero-shot voice cloning from a reference audio file
 - **`/v1/audio/design`** — Voice design via natural language attributes (e.g. `"female, low pitch, british accent"`)
-- **`/web`** — Built-in web UI with TTS, Clone, and Design tabs
+- **`/web`** — Built-in web UI with TTS, Clone (upload or **record from microphone**), and Design tabs
 - **`/docs`** — Swagger UI with inline audio player for all endpoints
 
 ---

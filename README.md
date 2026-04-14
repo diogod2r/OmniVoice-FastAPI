@@ -19,7 +19,7 @@ Dockerized FastAPI wrapper for [OmniVoice](https://github.com/k2-fsa/OmniVoice) 
 ### GPU (recommended)
 
 ```bash
-git clone https://github.com/your-username/omnivoice-fastapi.git
+git clone https://github.com/diogod2r/omnivoice-fastapi.git
 cd omnivoice-fastapi/docker/gpu
 docker compose up --build
 ```
@@ -33,7 +33,7 @@ cd omnivoice-fastapi/docker/cpu
 docker compose up --build
 ```
 
-The API is available at **http://localhost:8880**.
+The API is available at **http://localhost:8880/docs**.
 
 ---
 

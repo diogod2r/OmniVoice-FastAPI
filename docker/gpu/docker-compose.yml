@@ -1,8 +1,12 @@
+name: omnivoice-fastapi
+
 services:
   omnivoice-api:
-    build:
-      context: ../../
-      dockerfile: docker/gpu/Dockerfile
+    image: diogod2r/omnivoice-fastapi:latest
+    # To build locally instead:
+    # build:
+    #   context: ../../
+    #   dockerfile: docker/gpu/Dockerfile
     ports:
       - "8880:8880"
     volumes:

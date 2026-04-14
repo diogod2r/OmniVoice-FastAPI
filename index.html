@@ -203,6 +203,7 @@
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M4.5 9.5A.5.5 0 0 0 4 10a4 4 0 0 0 8 0 .5.5 0 0 0-1 0 3 3 0 0 1-6 0 .5.5 0 0 0-.5-.5z"/></svg>
             <span id="rec-meta-text"></span>
           </div>
+          <a id="rec-download" href="#" style="font-size:.85rem;color:var(--accent2)">⬇ Download</a>
         </div>
       </div>
 
@@ -475,6 +476,8 @@ async function startRecording() {
       document.getElementById('rec-preview').style.display = 'block';
       document.getElementById('rec-meta-text').textContent =
         `Gravação pronta · ${dur} · ${kb} KB — grave novamente para substituir`;
+      document.getElementById('rec-download').href = url;
+      document.getElementById('rec-download').download = `recording-${Date.now()}.webm`;
       document.getElementById('clone-ref').value = '';
 
       const area = document.getElementById('record-area');

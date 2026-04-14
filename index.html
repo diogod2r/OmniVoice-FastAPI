@@ -68,12 +68,26 @@
   .gh-star { background: var(--accent); border-color: var(--accent); border-radius: 6px; padding: .2rem .6rem; font-size: .75rem; margin-left: .3rem; }
   .ref-row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
   .ref-row input[type=file] { flex: 1; min-width: 0; }
-  button.record-btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .5rem 1rem; cursor: pointer; font-size: .88rem; white-space: nowrap; transition: all .2s; flex-shrink: 0; }
-  button.record-btn:hover { border-color: var(--accent); color: var(--accent); }
-  button.record-btn.recording { background: #3b1212; border-color: #ff4040; color: #ff6060; animation: recpulse 1s ease-in-out infinite; }
-  @keyframes recpulse { 0%,100%{opacity:1} 50%{opacity:.55} }
-  .rec-preview { margin-top: .6rem; display: none; }
-  .rec-preview audio { width: 100%; margin-top: 0; }
+  .record-area { margin-top: .8rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: border-color .3s; }
+  .record-area.active { border-color: #ff4554; box-shadow: 0 0 0 3px #ff455420; }
+  .record-bar { display: flex; align-items: center; gap: .8rem; padding: .65rem 1rem; background: var(--surface2); }
+  .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background .3s; }
+  .record-area.active .rec-dot { background: #ff4554; animation: recdot 1s ease-in-out infinite; }
+  @keyframes recdot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+  .rec-timer { font-size: .9rem; font-weight: 700; color: var(--text); min-width: 42px; font-variant-numeric: tabular-nums; }
+  .record-area.active .rec-timer { color: #ff4554; }
+  .rec-label { font-size: .82rem; color: var(--muted); flex: 1; }
+  button.record-btn { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 7px; padding: .4rem 1rem; cursor: pointer; font-size: .85rem; font-weight: 600; white-space: nowrap; transition: all .2s; flex-shrink: 0; }
+  button.record-btn:hover { background: var(--accent); color: #fff; }
+  button.record-btn.recording { border-color: #ff4554; color: #ff4554; }
+  button.record-btn.recording:hover { background: #ff4554; color: #fff; }
+  .rec-canvas-wrap { background: #0d0f1a; height: 56px; display: none; align-items: center; }
+  .record-area.active .rec-canvas-wrap { display: flex; }
+  #rec-canvas { width: 100%; height: 56px; display: block; }
+  .rec-preview { display: none; padding: .8rem 1rem; background: #111425; border-top: 1px solid var(--border); }
+  .rec-preview audio { width: 100%; border-radius: 8px; margin-bottom: .4rem; }
+  .rec-meta { font-size: .78rem; color: var(--accent2); display: flex; align-items: center; gap: .4rem; }
+  .rec-meta svg { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -170,14 +184,26 @@
       <label>Text to synthesize</label>
       <textarea id="clone-text" placeholder="Text to speak in the cloned voice..."></textarea>
 
-      <label>Reference audio (WAV/MP3/M4A)</label>
+      <label>Reference audio <span style="color:var(--muted)">(WAV / MP3 / M4A — 3–10 s recomendado)</span></label>
       <div class="ref-row">
         <input type="file" id="clone-ref" accept="audio/*" style="padding:.4rem" onchange="clearRecording()">
-        <button class="record-btn" id="record-btn" onclick="toggleRecord()">🎤 Gravar</button>
       </div>
-      <div class="rec-preview" id="rec-preview">
-        <audio id="rec-audio" controls></audio>
-        <p class="hint" id="rec-hint"></p>
+
+      <div class="record-area" id="record-area">
+        <div class="record-bar">
+          <span class="rec-dot"></span>
+          <span class="rec-timer" id="rec-timer">0:00</span>
+          <span class="rec-label" id="rec-label">Clique em Gravar para capturar pelo microfone</span>
+          <button class="record-btn" id="record-btn" onclick="toggleRecord()">🎤 Gravar</button>
+        </div>
+        <div class="rec-canvas-wrap"><canvas id="rec-canvas"></canvas></div>
+        <div class="rec-preview" id="rec-preview">
+          <audio id="rec-audio" controls></audio>
+          <div class="rec-meta">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M4.5 9.5A.5.5 0 0 0 4 10a4 4 0 0 0 8 0 .5.5 0 0 0-1 0 3 3 0 0 1-6 0 .5.5 0 0 0-.5-.5z"/></svg>
+            <span id="rec-meta-text"></span>
+          </div>
+        </div>
       </div>
 
       <label>Reference transcription <span style="color:var(--muted)">(optional — auto-transcribed if blank)</span></label>
@@ -395,9 +421,18 @@ async function runClone() {
 }
 
 // ── Microphone recording ─────────────────────────────────────────────────────
-let mediaRecorder = null;
+let mediaRecorder  = null;
 let recordedChunks = [];
 let recordedBlob   = null;
+let recTimerInterval = null;
+let recStartTime     = 0;
+let animFrameId      = null;
+let analyser         = null;
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
 
 async function toggleRecord() {
   if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -412,26 +447,119 @@ async function startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     recordedChunks = [];
     recordedBlob   = null;
-    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+
+    // Web Audio analyser for waveform
+    const ctx  = new AudioContext();
+    const src  = ctx.createMediaStreamSource(stream);
+    analyser   = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    src.connect(analyser);
+    drawWaveform();
+
+    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach(t => t.stop());
+      ctx.close();
+      cancelAnimationFrame(animFrameId);
+      clearInterval(recTimerInterval);
+
       recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-      const url = URL.createObjectURL(recordedBlob);
+      const url    = URL.createObjectURL(recordedBlob);
+      const dur    = fmtTime(Date.now() - recStartTime);
+      const kb     = (recordedBlob.size / 1024).toFixed(1);
+
       document.getElementById('rec-audio').src = url;
       document.getElementById('rec-preview').style.display = 'block';
-      document.getElementById('rec-hint').textContent =
-        '✔ Gravação pronta — ' + (recordedBlob.size / 1024).toFixed(1) + ' KB. Pode gravar novamente para substituir.';
+      document.getElementById('rec-meta-text').textContent =
+        `Gravação pronta · ${dur} · ${kb} KB — grave novamente para substituir`;
       document.getElementById('clone-ref').value = '';
+
+      const area = document.getElementById('record-area');
+      area.classList.remove('active');
+      document.getElementById('rec-label').textContent = 'Gravação concluída — clique em Gravar para refazer';
+      document.getElementById('rec-timer').textContent = '0:00';
     };
-    mediaRecorder.start();
+    mediaRecorder.start(100);
+    recStartTime = Date.now();
+
+    // Timer
+    recTimerInterval = setInterval(() => {
+      document.getElementById('rec-timer').textContent = fmtTime(Date.now() - recStartTime);
+    }, 200);
+
+    document.getElementById('record-area').classList.add('active');
+    document.getElementById('rec-label').textContent = 'Gravando... fale agora';
+    document.getElementById('rec-preview').style.display = 'none';
     const btn = document.getElementById('record-btn');
     btn.textContent = '⏹ Parar';
     btn.classList.add('recording');
   } catch(e) {
     alert('Erro ao acessar microfone: ' + e.message);
   }
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById('rec-canvas');
+  const ctx2   = canvas.getContext('2d');
+
+  const DPR = window.devicePixelRatio || 1;
+  const W   = canvas.offsetWidth || 700;
+  const H   = 56;
+  canvas.width  = W * DPR;
+  canvas.height = H * DPR;
+  ctx2.scale(DPR, DPR);
+
+  const BAR_W = 3, GAP = 1.5, STEP = BAR_W + GAP;
+  const N_BARS = Math.floor(W / STEP);
+  const amps = [];   // grows with push(), never pre-filled
+  const MIN_H = 2;
+  let lastSample = 0;
+
+  const timeBuf = new Uint8Array(analyser.fftSize);
+  function getRMS() {
+    analyser.getByteTimeDomainData(timeBuf);
+    let sum = 0;
+    for (let i = 0; i < timeBuf.length; i++) {
+      const v = (timeBuf[i] - 128) / 128;
+      sum += v * v;
+    }
+    return Math.sqrt(sum / timeBuf.length);
+  }
+
+  function draw(ts) {
+    animFrameId = requestAnimationFrame(draw);
+
+    // sample ~25×/s
+    if (ts - lastSample > 40) {
+      lastSample = ts;
+      amps.push(getRMS());
+      if (amps.length > N_BARS) amps.shift(); // scroll oldest off left
+    }
+
+    ctx2.clearRect(0, 0, W, H);
+    const cy = H / 2;
+
+    // ── recorded bars ──────────────────────────────────────────
+    for (let i = 0; i < amps.length; i++) {
+      const amp  = amps[i];
+      const barH = Math.max(MIN_H, amp * (H - 4) * 2.8);
+      const alpha = Math.min(0.95, 0.3 + amp * 3.5);
+      ctx2.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx2.beginPath();
+      ctx2.roundRect(i * STEP, cy - barH / 2, BAR_W, barH, 1.5);
+      ctx2.fill();
+    }
+
+    // ── future dots (right side, faint) ────────────────────────
+    for (let i = amps.length; i < N_BARS; i++) {
+      ctx2.fillStyle = 'rgba(255,255,255,0.09)';
+      ctx2.fillRect(i * STEP, cy - 1, BAR_W, 2);
+    }
+  }
+  requestAnimationFrame(draw);
 }
 
 function stopRecording() {
@@ -447,6 +575,8 @@ function clearRecording() {
   recordedBlob = null;
   document.getElementById('rec-preview').style.display = 'none';
   document.getElementById('rec-audio').src = '';
+  document.getElementById('rec-label').textContent = 'Clique em Gravar para capturar pelo microfone';
+  document.getElementById('record-area').classList.remove('active');
 }
 
 async function runDesign() {

@@ -472,7 +472,15 @@ async function startRecording() {
       const dur    = fmtTime(Date.now() - recStartTime);
       const kb     = (recordedBlob.size / 1024).toFixed(1);
 
-      document.getElementById('rec-audio').src = url;
+      const recAudio = document.getElementById('rec-audio');
+      recAudio.src = url;
+      // Fix: webm blobs have no duration metadata — seek to end to force browser to compute it
+      recAudio.onloadedmetadata = () => {
+        if (!isFinite(recAudio.duration)) {
+          recAudio.currentTime = 1e9;
+          recAudio.ontimeupdate = () => { recAudio.ontimeupdate = null; recAudio.currentTime = 0; };
+        }
+      };
       document.getElementById('rec-preview').style.display = 'block';
       document.getElementById('rec-meta-text').textContent =
         `Gravação pronta · ${dur} · ${kb} KB — grave novamente para substituir`;

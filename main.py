@@ -297,6 +297,9 @@ async def clone_voice(
 
     if ref_audio_base64:
         try:
+            # Strip data URI prefix if present (e.g. "data:audio/webm;base64,...")
+            if "," in ref_audio_base64:
+                ref_audio_base64 = ref_audio_base64.split(",", 1)[1]
             audio_bytes = base64.b64decode(ref_audio_base64)
         except Exception:
             raise HTTPException(400, "ref_audio_base64 is not valid base64")

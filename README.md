@@ -16,22 +16,28 @@ Dockerized FastAPI wrapper for [OmniVoice](https://github.com/k2-fsa/OmniVoice) 
 
 ## Quick Start
 
+No clone required — run directly from Docker Hub:
+
 ### GPU (recommended)
 
 ```bash
-git clone https://github.com/diogod2r/omnivoice-fastapi.git
-cd omnivoice-fastapi/docker/gpu
-docker compose up
+docker run --gpus all -p 8880:8880 \
+  -v omnivoice_models:/app/models \
+  --name omnivoice-fastapi \
+  diogod2r/omnivoice-fastapi:latest
 ```
-
-> Pulls the pre-built image from Docker Hub — no build required. First run downloads the model (~4 GB) to a Docker volume. Subsequent starts are instant.
 
 ### CPU
 
 ```bash
-cd omnivoice-fastapi/docker/cpu
-docker compose up
+docker run -p 8880:8880 \
+  -v omnivoice_models:/app/models \
+  -e DEVICE=cpu \
+  --name omnivoice-fastapi-cpu \
+  diogod2r/omnivoice-fastapi:cpu
 ```
+
+> First run downloads the model (~4 GB) to the `omnivoice_models` volume. Subsequent starts are instant.
 
 The API is available at **http://localhost:8880/docs**.
 
@@ -39,12 +45,19 @@ The API is available at **http://localhost:8880/docs**.
 
 [![Docker Hub](https://img.shields.io/docker/pulls/diogod2r/omnivoice-fastapi?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/diogod2r/omnivoice-fastapi)
 
+### Docker Compose (optional)
+
+If you prefer compose, clone the repo and run:
+
 ```bash
 # GPU
-docker run --gpus all -p 8880:8880 -v omnivoice_models:/app/models diogod2r/omnivoice-fastapi:latest
+git clone https://github.com/diogod2r/omnivoice-fastapi.git
+cd omnivoice-fastapi/docker/gpu
+docker compose up
 
 # CPU
-docker run -p 8880:8880 -v omnivoice_models:/app/models -e DEVICE=cpu diogod2r/omnivoice-fastapi:cpu
+cd omnivoice-fastapi/docker/cpu
+docker compose up
 ```
 
 ---
